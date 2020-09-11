@@ -50,7 +50,6 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                 archflags=""
             fi
 
-            mkdir -p "$stage/include/zlib"
             mkdir -p "$stage/lib/debug"
             mkdir -p "$stage/lib/release"
 
