@@ -89,8 +89,8 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/debug/libjpeg.a</string>
-            <string>lib/release/libjpeg.a</string>
+            <string>lib/debug/*.so*</string>
+            <string>lib/release/*.so*</string>
           </array>
           <key>name</key>
           <string>linux</string>
