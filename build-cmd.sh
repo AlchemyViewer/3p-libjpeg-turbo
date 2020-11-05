@@ -103,14 +103,14 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
             # Setup build flags
             ARCH_FLAGS="-arch x86_64"
             SDK_FLAGS="-mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET} --sysroot=${SDKROOT}"
-        	DEBUG_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -Og -g -msse4.2 -fPIC -DPIC"
-			RELEASE_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -Ofast -ffast-math -flto -g -msse4.2 -fPIC -DPIC -fstack-protector-strong"
-			DEBUG_CFLAGS="$DEBUG_COMMON_FLAGS"
-			RELEASE_CFLAGS="$RELEASE_COMMON_FLAGS"
+            DEBUG_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -Og -g -msse4.2 -fPIC -DPIC"
+            RELEASE_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -Ofast -ffast-math -flto -g -msse4.2 -fPIC -DPIC -fstack-protector-strong"
+            DEBUG_CFLAGS="$DEBUG_COMMON_FLAGS"
+            RELEASE_CFLAGS="$RELEASE_COMMON_FLAGS"
             DEBUG_CXXFLAGS="$DEBUG_COMMON_FLAGS -std=c++17"
-			RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
+            RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
             DEBUG_CPPFLAGS="-DPIC"
-			RELEASE_CPPFLAGS="-DPIC"
+            RELEASE_CPPFLAGS="-DPIC"
             DEBUG_LDFLAGS="$ARCH_FLAGS -headerpad_max_install_names"
             RELEASE_LDFLAGS="$ARCH_FLAGS -headerpad_max_install_names"
 
@@ -133,7 +133,9 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                     -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD="c++17" \
                     -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY="libc++" \
                     -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
-                    -DCMAKE_OSX_ARCHITECTURES:STRING=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} -DCMAKE_OSX_SYSROOT=${SDKROOT} \
+                    -DCMAKE_OSX_ARCHITECTURES:STRING=x86_64 \
+                    -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
+                    -DCMAKE_OSX_SYSROOT=${SDKROOT} \
                     -DCMAKE_MACOSX_RPATH=YES -DCMAKE_INSTALL_PREFIX=$stage
 
                 cmake --build . --config Debug --clean-first
