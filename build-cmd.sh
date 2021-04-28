@@ -38,8 +38,6 @@ mkdir -p "$stage_release"
 
 VERSION_HEADER_FILE="$stage_include/jconfig.h"
 
-build=${AUTOBUILD_BUILD_ID:=0}
-
 pushd "$LIBJPEG_TURBO_SOURCE_DIR"
     case "$AUTOBUILD_PLATFORM" in
         windows*)
@@ -68,6 +66,7 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
 
                 cp -a Debug/jpeg.{exp,lib} "$stage_debug/"
                 cp -a Debug/jpeg8.{dll,pdb} "$stage_debug/"
+                cp -a Debug/turbojpeg.{exp,lib,dll,pdb} "$stage_debug/"
             popd
 
             mkdir -p "build_release"
@@ -85,6 +84,7 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
 
                 cp -a Release/jpeg.{exp,lib} "$stage_release/"
                 cp -a Release/jpeg8.{dll,pdb} "$stage_release/"
+                cp -a Release/turbojpeg.{exp,lib,dll,pdb} "$stage_release/"
 
                 cp -a "jconfig.h" "$stage_include"
             popd
@@ -92,82 +92,188 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
             cp -a jerror.h "$stage_include"
             cp -a jmorecfg.h "$stage_include"
             cp -a jpeglib.h "$stage_include"
+            cp -a turbojpeg.h "$stage_include"
         ;;
-        "darwin")
-            opts="${LL_BUILD_RELEASE}"
-            mkdir -p "build"
-            pushd "build"
+        darwin*)
+            # Setup osx sdk platform
+            SDKNAME="macosx10.15"
+            export SDKROOT=$(xcodebuild -version -sdk ${SDKNAME} Path)
+            export MACOSX_DEPLOYMENT_TARGET=10.13
 
-            cmake -G "Unix Makefiles" -DCMAKE_OSX_SYSROOT="macosx10.14" -DCMAKE_OSX_DEPLOYMENT_TARGET="10.13" \
-                -DCMAKE_C_FLAGS="-arch x86_64"  \
-                -DWITH_JPEG8=ON -DWITH_SIMD=ON \
-                -DENABLE_STATIC=ON -DENABLE_SHARED=OFF ..
-            cmake --build . --config Debug --clean-first
-            cp *.a "${stage_debug}"
-            cmake --build . --config Release --clean-first
-            cp *.a "${stage_release}"
+            # Setup build flags
+            ARCH_FLAGS="-arch x86_64"
+            SDK_FLAGS="-mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET} -isysroot ${SDKROOT}"
+            DEBUG_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -Og -g -msse4.2 -fPIC -DPIC"
+            RELEASE_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -Ofast -ffast-math -flto -g -msse4.2 -fPIC -DPIC -fstack-protector-strong"
+            DEBUG_CFLAGS="$DEBUG_COMMON_FLAGS"
+            RELEASE_CFLAGS="$RELEASE_COMMON_FLAGS"
+            DEBUG_CXXFLAGS="$DEBUG_COMMON_FLAGS -std=c++17"
+            RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
+            DEBUG_CPPFLAGS="-DPIC"
+            RELEASE_CPPFLAGS="-DPIC"
+            DEBUG_LDFLAGS="$ARCH_FLAGS $SDK_FLAGS -Wl,-headerpad_max_install_names -Wl,-macos_version_min,$MACOSX_DEPLOYMENT_TARGET"
+            RELEASE_LDFLAGS="$ARCH_FLAGS $SDK_FLAGS -Wl,-headerpad_max_install_names -Wl,-macos_version_min,$MACOSX_DEPLOYMENT_TARGET"
 
-            cp -a "jconfig.h" "${stage_include}"
+            mkdir -p "build_debug"
+            pushd "build_debug"
+                CFLAGS="$DEBUG_CFLAGS" \
+                CXXFLAGS="$DEBUG_CXXFLAGS" \
+                CPPFLAGS="$DEBUG_CPPFLAGS" \
+                LDFLAGS="$DEBUG_LDFLAGS" \
+                cmake .. -GXcode -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=ON -DENABLE_STATIC=OFF -DREQUIRE_SIMD=ON \
+                    -DCMAKE_C_FLAGS="$DEBUG_CFLAGS" \
+                    -DCMAKE_CXX_FLAGS="$DEBUG_CXXFLAGS" \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL="0" \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH=NO \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS=YES \
+                    -DCMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT=dwarf-with-dsym \
+                    -DCMAKE_XCODE_ATTRIBUTE_LLVM_LTO=NO \
+                    -DCMAKE_XCODE_ATTRIBUTE_DEAD_CODE_STRIPPING=YES \
+                    -DCMAKE_XCODE_ATTRIBUTE_CLANG_X86_VECTOR_INSTRUCTIONS=sse4.2 \
+                    -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD="c++17" \
+                    -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY="libc++" \
+                    -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
+                    -DCMAKE_OSX_ARCHITECTURES:STRING=x86_64 \
+                    -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
+                    -DCMAKE_OSX_SYSROOT=${SDKROOT} \
+                    -DCMAKE_MACOSX_RPATH=YES -DCMAKE_INSTALL_PREFIX=$stage
 
+                cmake --build . --config Debug --clean-first
+
+                # conditionally run unit tests
+                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                    ctest -C Debug
+                fi
+
+                cp -a Debug/*.dylib* "${stage_debug}"
+            popd
+
+            mkdir -p "build_release"
+            pushd "build_release"
+                CFLAGS="$RELEASE_CFLAGS" \
+                CXXFLAGS="$RELEASE_CXXFLAGS" \
+                CPPFLAGS="$RELEASE_CPPFLAGS" \
+                LDFLAGS="$RELEASE_LDFLAGS" \
+                cmake .. -GXcode -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=ON -DENABLE_STATIC=OFF -DREQUIRE_SIMD=ON \
+                    -DCMAKE_C_FLAGS="$RELEASE_CFLAGS" \
+                    -DCMAKE_CXX_FLAGS="$RELEASE_CXXFLAGS" \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL="fast" \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH=YES \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS=YES \
+                    -DCMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT=dwarf-with-dsym \
+                    -DCMAKE_XCODE_ATTRIBUTE_LLVM_LTO=YES \
+                    -DCMAKE_XCODE_ATTRIBUTE_DEAD_CODE_STRIPPING=YES \
+                    -DCMAKE_XCODE_ATTRIBUTE_CLANG_X86_VECTOR_INSTRUCTIONS=sse4.2 \
+                    -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD="c++17" \
+                    -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY="libc++" \
+                    -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
+                    -DCMAKE_OSX_ARCHITECTURES:STRING=x86_64 \
+                    -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
+                    -DCMAKE_OSX_SYSROOT=${SDKROOT} \
+                    -DCMAKE_MACOSX_RPATH=YES \
+                    -DCMAKE_INSTALL_PREFIX=$stage
+
+                cmake --build . --config Release --clean-first
+
+                # conditionally run unit tests
+                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                    ctest -C Release
+                fi
+                cp -a Release/*.dylib* "${stage_release}"
+
+                cp -a "jconfig.h" "${stage_include}"
+            popd
+
+            pushd "${stage}/lib/debug"
+                fix_dylib_id "libjpeg.dylib"
+                fix_dylib_id "libturbojpeg.dylib"
+                strip -x -S libjpeg.dylib
+                strip -x -S libturbojpeg.dylib
+            popd
+
+            pushd "${stage}/lib/release"
+                fix_dylib_id "libjpeg.dylib"
+                fix_dylib_id "libturbojpeg.dylib"
+                strip -x -S libjpeg.dylib
+                strip -x -S libturbojpeg.dylib
             popd
 
             cp -a jerror.h "$stage_include"
             cp -a jmorecfg.h "$stage_include"
             cp -a jpeglib.h "$stage_include"
-
+            cp -a turbojpeg.h "$stage_include"
         ;;
-        "linux")
+        linux*)
+            # Default target per --address-size
+            opts="${TARGET_OPTS:--m$AUTOBUILD_ADDRSIZE}"
+
+            # Setup build flags
+            DEBUG_COMMON_FLAGS="$opts -Og -g -fPIC -DPIC"
+            RELEASE_COMMON_FLAGS="$opts -O3 -g -fPIC -DPIC -D_FORTIFY_SOURCE=2"
+            DEBUG_CFLAGS="$DEBUG_COMMON_FLAGS"
+            RELEASE_CFLAGS="$RELEASE_COMMON_FLAGS"
+            DEBUG_CXXFLAGS="$DEBUG_COMMON_FLAGS -std=c++17"
+            RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
+            DEBUG_CPPFLAGS="-DPIC"
+            RELEASE_CPPFLAGS="-DPIC"
+
             JOBS=`cat /proc/cpuinfo | grep processor | wc -l`
-            HARDENED="-fstack-protector-strong -D_FORTIFY_SOURCE=2"
 
-            autoreconf -fvi
+            if [ "$AUTOBUILD_ADDRSIZE" = 32 ]
+            then
+                archflags="/arch:SSE2"
+            else
+                archflags=""
+            fi
 
-            # Let's remain compatible with the LL viewer cmake for less merge hell in the future if it ever changes.
-            # and until Windows and Darwin builds are worked out for this thing.
-            # Debug Build
-            CFLAGS="-m32 -Og -g" CXXFLAGS="$CFLAGS -std=c++11" LDFLAGS="-m32" ./configure --with-jpeg8 \
-                    --with-pic --prefix="\${AUTOBUILD_PACKAGES_DIR}" --includedir="\${prefix}/include/jpeglib" --libdir="\${prefix}/lib/debug"
-            make -j$JOBS
-            make install DESTDIR="$stage"
+            mkdir -p "$stage/lib/debug"
+            mkdir -p "$stage/lib/release"
 
-            make distclean
+            mkdir -p "build_debug"
+            pushd "build_debug"
+                # Invoke cmake and use as official build
+                cmake -E env CFLAGS="$DEBUG_CFLAGS" CXXFLAGS="$DEBUG_CXXFLAGS" \
+                cmake ../ -DCMAKE_BUILD_TYPE="Debug" -DWITH_JPEG8=ON -DWITH_SIMD=ON -DREQUIRE_SIMD=ON
 
-            # Release Build
-            CFLAGS="-m32 -O3 -g $HARDENED" CXXFLAGS="$CFLAGS -std=c++11" LDFLAGS="-m32" ./configure --with-jpeg8 \
-                    --with-pic --prefix="\${AUTOBUILD_PACKAGES_DIR}" --includedir="\${prefix}/include/jpeglib" --libdir="\${prefix}/lib/release"
-            make -j$JOBS
-            make install DESTDIR="$stage"
+                cmake --build . -j$JOBS --config Debug --clean-first
 
-            make distclean
-        ;;
-        "linux64")
-            JOBS=`cat /proc/cpuinfo | grep processor | wc -l`
-            HARDENED="-fstack-protector-strong -D_FORTIFY_SOURCE=2"
+                # conditionally run unit tests
+                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                    ctest -C Debug
+                fi
 
-            autoreconf -fvi
+                cp -a libjpeg.so* "$stage_debug/"
+                cp -a libturbojpeg.so* "$stage_debug/"
+            popd
 
-            # Let's remain compatible with the LL viewer cmake for less merge hell in the future if it ever changes.
-            # and until Windows and Darwin builds are worked out for this thing.
-            # Debug Build
-            CFLAGS="-m64 -Og -g" CXXFLAGS="$CFLAGS -std=c++11" LDFLAGS="-m64" ./configure --with-jpeg8 \
-                    --with-pic --prefix="\${AUTOBUILD_PACKAGES_DIR}" --includedir="\${prefix}/include/jpeglib" --libdir="\${prefix}/lib/debug"
-            make -j$JOBS
-            make install DESTDIR="$stage"
+            mkdir -p "build_release"
+            pushd "build_release"
+                # Invoke cmake and use as official build
+                cmake -E env CFLAGS="$RELEASE_CFLAGS" CXXFLAGS="$RELEASE_CXXFLAGS" \
+                cmake ../ -DCMAKE_BUILD_TYPE="Release" -DWITH_JPEG8=ON -DWITH_SIMD=ON -DREQUIRE_SIMD=ON
 
-            make distclean
+                cmake --build . -j$JOBS --config Release --clean-first
 
-            # Release Build
-            CFLAGS="-m64 -O3 -g $HARDENED" CXXFLAGS="$CFLAGS -std=c++11" LDFLAGS="-m64" ./configure --with-jpeg8 \
-                    --with-pic --prefix="\${AUTOBUILD_PACKAGES_DIR}" --includedir="\${prefix}/include/jpeglib" --libdir="\${prefix}/lib/release"
-            make -j$JOBS
-            make install DESTDIR="$stage"
+                # conditionally run unit tests
+                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                    ctest -C Release
+                fi
 
-            make distclean
+                cp -a libjpeg.so* "$stage_release/"
+                cp -a libturbojpeg.so* "$stage_release/"
+
+                cp -a "jconfig.h" "$stage_include"
+            popd
+
+            cp -a jerror.h "$stage_include"
+            cp -a jmorecfg.h "$stage_include"
+            cp -a jpeglib.h "$stage_include"
+            cp -a turbojpeg.h "$stage_include"
         ;;
     esac
     mkdir -p "$stage/LICENSES"
     cp LICENSE.md "$stage/LICENSES/libjpeg-turbo.txt"
-	
+
     # version will be (e.g.) "1.4.0"
     version=`sed -n -E 's/#define LIBJPEG_TURBO_VERSION  ([0-9])[.]([0-9])[.]([0-9]).*/\1.\2.\3/p' "${VERSION_HEADER_FILE}"`
     # shortver will be (e.g.) "230": eliminate all '.' chars
@@ -175,6 +281,6 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
     short="$(echo $version | cut -d"." -f1-2)"
     shortver="${short//.}"
 
-    echo "${version}.${build}" > "${stage}/VERSION.txt"
+    echo "${version}" > "${stage}/VERSION.txt"
 
 popd
