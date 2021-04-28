@@ -598,6 +598,13 @@ if(ENABLE_STATIC)
   if(NOT MSVC)
     set_target_properties(jpeg-static PROPERTIES OUTPUT_NAME jpeg)
   endif()
+
+# <ALCHEMY>
+  if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+    target_compile_options(jpeg-static PRIVATE /std:c++17 /permissive- /Z7 $<$<CONFIG:Release>:/Ob3> $<$<CONFIG:Release>:/Gy> $<$<EQUAL:${CMAKE_SIZEOF_VOID_P},4>:/arch:SSE2>)
+    target_link_options(jpeg-static PRIVATE /DEBUG:FULL $<$<CONFIG:Release>:/OPT:REF> $<$<CONFIG:Release>:/OPT:ICF>)
+  endif()
+# </ALCHEMY>
 endif()
 
 if(WITH_TURBOJPEG)
@@ -656,6 +663,13 @@ if(WITH_TURBOJPEG)
     if(NOT MSVC)
       set_target_properties(turbojpeg-static PROPERTIES OUTPUT_NAME turbojpeg)
     endif()
+
+# <ALCHEMY>
+    if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+      target_compile_options(turbojpeg-static PRIVATE /std:c++17 /permissive- /Z7 $<$<CONFIG:Release>:/Ob3> $<$<CONFIG:Release>:/Gy> $<$<EQUAL:${CMAKE_SIZEOF_VOID_P},4>:/arch:SSE2>)
+      target_link_options(turbojpeg-static PRIVATE /DEBUG:FULL $<$<CONFIG:Release>:/OPT:REF> $<$<CONFIG:Release>:/OPT:ICF>)
+    endif()
+# </ALCHEMY>
 
     add_executable(tjunittest-static tjunittest.c tjutil.c md5/md5.c
       md5/md5hl.c)

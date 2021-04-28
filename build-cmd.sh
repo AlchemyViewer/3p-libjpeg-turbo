@@ -54,8 +54,7 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
             mkdir -p "build_debug"
             pushd "build_debug"
                 # Invoke cmake and use as official build
-                cmake -E env CFLAGS="$archflags" CXXFLAGS="$archflags /std:c++17 /permissive-" LDFLAGS="/DEBUG:FULL" \
-                cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$AUTOBUILD_WIN_VSPLATFORM" ../ -DWITH_JPEG8=ON -DWITH_CRT_DLL=ON -DWITH_SIMD=ON -DENABLE_SHARED=ON -DENABLE_STATIC=OFF -DREQUIRE_SIMD=ON
+                cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$AUTOBUILD_WIN_VSPLATFORM" ../ -DWITH_JPEG8=ON -DWITH_CRT_DLL=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON
 
                 cmake --build . --config Debug --clean-first
 
@@ -64,16 +63,14 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                     ctest -C Debug
                 fi
 
-                cp -a Debug/jpeg.{exp,lib} "$stage_debug/"
-                cp -a Debug/jpeg8.{dll,pdb} "$stage_debug/"
-                cp -a Debug/turbojpeg.{exp,lib,dll,pdb} "$stage_debug/"
+                cp -a Debug/jpeg-static.lib "$stage_debug/jpeg.lib"
+                cp -a Debug/turbojpeg-static.lib "$stage_debug/turbojpeg.lib"
             popd
 
             mkdir -p "build_release"
             pushd "build_release"
                 # Invoke cmake and use as official build
-                cmake -E env CFLAGS="$archflags /Ob3 /GL /Gy /Zi" CXXFLAGS="$archflags /Ob3 /GL /Gy /Zi /std:c++17 /permissive-" LDFLAGS="/LTCG /OPT:REF /OPT:ICF /DEBUG:FULL" \
-                cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$AUTOBUILD_WIN_VSPLATFORM" ../ -DWITH_JPEG8=ON -DWITH_CRT_DLL=ON -DWITH_SIMD=ON -DENABLE_SHARED=ON -DENABLE_STATIC=OFF -DREQUIRE_SIMD=ON
+                cmake -G "$AUTOBUILD_WIN_CMAKE_GEN" -A "$AUTOBUILD_WIN_VSPLATFORM" ../ -DWITH_JPEG8=ON -DWITH_CRT_DLL=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON
 
                 cmake --build . --config Release --clean-first
 
@@ -82,9 +79,8 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                     ctest -C Release
                 fi
 
-                cp -a Release/jpeg.{exp,lib} "$stage_release/"
-                cp -a Release/jpeg8.{dll,pdb} "$stage_release/"
-                cp -a Release/turbojpeg.{exp,lib,dll,pdb} "$stage_release/"
+                cp -a Release/jpeg-static.lib "$stage_release/jpeg.lib"
+                cp -a Release/turbojpeg-static.lib "$stage_release/turbojpeg.lib"
 
                 cp -a "jconfig.h" "$stage_include"
             popd
