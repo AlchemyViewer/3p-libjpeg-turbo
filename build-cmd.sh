@@ -94,31 +94,38 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
             # Setup osx sdk platform
             SDKNAME="macosx"
             export SDKROOT=$(xcodebuild -version -sdk ${SDKNAME} Path)
-            export MACOSX_DEPLOYMENT_TARGET=10.15
+
+            # Deploy Targets
+            X86_DEPLOY=10.15
+            ARM64_DEPLOY=11.0
 
             # Setup build flags
-            ARCH_FLAGS="-arch x86_64"
-            SDK_FLAGS="-mmacosx-version-min=${MACOSX_DEPLOYMENT_TARGET} -isysroot ${SDKROOT}"
-            DEBUG_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -O0 -g -msse4.2 -fPIC -DPIC"
-            RELEASE_COMMON_FLAGS="$ARCH_FLAGS $SDK_FLAGS -Ofast -ffast-math -g -msse4.2 -fPIC -DPIC -fstack-protector-strong"
+            ARCH_FLAGS_X86="-arch x86_64 -mmacosx-version-min=${X86_DEPLOY} -isysroot ${SDKROOT} -msse4.2"
+            ARCH_FLAGS_ARM64="-arch arm64 -mmacosx-version-min=${ARM64_DEPLOY} -isysroot ${SDKROOT}"
+            DEBUG_COMMON_FLAGS="-O0 -g -fPIC -DPIC"
+            RELEASE_COMMON_FLAGS="-O3 -g -fPIC -DPIC -fstack-protector-strong"
             DEBUG_CFLAGS="$DEBUG_COMMON_FLAGS"
             RELEASE_CFLAGS="$RELEASE_COMMON_FLAGS"
             DEBUG_CXXFLAGS="$DEBUG_COMMON_FLAGS -std=c++17"
             RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
             DEBUG_CPPFLAGS="-DPIC"
             RELEASE_CPPFLAGS="-DPIC"
-            DEBUG_LDFLAGS="$ARCH_FLAGS $SDK_FLAGS -Wl,-headerpad_max_install_names"
-            RELEASE_LDFLAGS="$ARCH_FLAGS $SDK_FLAGS -Wl,-headerpad_max_install_names"
+            DEBUG_LDFLAGS="-Wl,-headerpad_max_install_names"
+            RELEASE_LDFLAGS="-Wl,-headerpad_max_install_names"
 
-            mkdir -p "build_debug"
-            pushd "build_debug"
-                CFLAGS="$DEBUG_CFLAGS" \
-                CXXFLAGS="$DEBUG_CXXFLAGS" \
-                CPPFLAGS="$DEBUG_CPPFLAGS" \
-                LDFLAGS="$DEBUG_LDFLAGS" \
+            # x86 Deploy Target
+            export MACOSX_DEPLOYMENT_TARGET=${X86_DEPLOY}
+
+            mkdir -p "build_debug_x86"
+            pushd "build_debug_x86"
+                CFLAGS="$ARCH_FLAGS_X86 $DEBUG_CFLAGS" \
+                CXXFLAGS="$ARCH_FLAGS_X86 $DEBUG_CXXFLAGS" \
+                CPPFLAGS="$ARCH_FLAGS_X86 $DEBUG_CPPFLAGS" \
+                LDFLAGS="$ARCH_FLAGS_X86 $DEBUG_LDFLAGS" \
                 cmake .. -GXcode -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
-                    -DCMAKE_C_FLAGS="$DEBUG_CFLAGS" \
-                    -DCMAKE_CXX_FLAGS="$DEBUG_CXXFLAGS" \
+                    -DCMAKE_BUILD_TYPE="Debug" \
+                    -DCMAKE_C_FLAGS="$ARCH_FLAGS_X86 $DEBUG_CFLAGS" \
+                    -DCMAKE_CXX_FLAGS="$ARCH_FLAGS_X86 $DEBUG_CXXFLAGS" \
                     -DCMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL="0" \
                     -DCMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH=NO \
                     -DCMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS=YES \
@@ -132,27 +139,28 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                     -DCMAKE_OSX_ARCHITECTURES:STRING=x86_64 \
                     -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
                     -DCMAKE_OSX_SYSROOT=${SDKROOT} \
-                    -DCMAKE_MACOSX_RPATH=YES -DCMAKE_INSTALL_PREFIX=$stage
+                    -DCMAKE_MACOSX_RPATH=YES \
+                    -DCMAKE_INSTALL_PREFIX="$stage/debug_x86"
 
-                cmake --build . --config Debug --clean-first
+                cmake --build . --config Debug
+                cmake --install . --config Debug
 
                 # conditionally run unit tests
                 if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
                     ctest -C Debug
                 fi
-
-                cp -a Debug/*.a* "${stage_debug}"
             popd
 
-            mkdir -p "build_release"
-            pushd "build_release"
-                CFLAGS="$RELEASE_CFLAGS" \
-                CXXFLAGS="$RELEASE_CXXFLAGS" \
-                CPPFLAGS="$RELEASE_CPPFLAGS" \
-                LDFLAGS="$RELEASE_LDFLAGS" \
+            mkdir -p "build_release_x86"
+            pushd "build_release_x86"
+                CFLAGS="$ARCH_FLAGS_X86 $RELEASE_CFLAGS" \
+                CXXFLAGS="$ARCH_FLAGS_X86 $RELEASE_CXXFLAGS" \
+                CPPFLAGS="$ARCH_FLAGS_X86 $RELEASE_CPPFLAGS" \
+                LDFLAGS="$ARCH_FLAGS_X86 $RELEASE_LDFLAGS" \
                 cmake .. -GXcode -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
-                    -DCMAKE_C_FLAGS="$RELEASE_CFLAGS" \
-                    -DCMAKE_CXX_FLAGS="$RELEASE_CXXFLAGS" \
+                    -DCMAKE_BUILD_TYPE="Release" \
+                    -DCMAKE_C_FLAGS="$ARCH_FLAGS_X86 $RELEASE_CFLAGS" \
+                    -DCMAKE_CXX_FLAGS="$ARCH_FLAGS_X86 $RELEASE_CXXFLAGS" \
                     -DCMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL="fast" \
                     -DCMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH=YES \
                     -DCMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS=YES \
@@ -167,23 +175,96 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                     -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
                     -DCMAKE_OSX_SYSROOT=${SDKROOT} \
                     -DCMAKE_MACOSX_RPATH=YES \
-                    -DCMAKE_INSTALL_PREFIX=$stage
+                    -DCMAKE_INSTALL_PREFIX="$stage/release_x86"
 
-                cmake --build . --config Release --clean-first
+                cmake --build . --config Release
+                cmake --install . --config Release
 
                 # conditionally run unit tests
                 if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
                     ctest -C Release
                 fi
-                cp -a Release/*.a* "${stage_release}"
-
-                cp -a "jconfig.h" "${stage_include}"
             popd
 
-            cp -a jerror.h "$stage_include"
-            cp -a jmorecfg.h "$stage_include"
-            cp -a jpeglib.h "$stage_include"
-            cp -a turbojpeg.h "$stage_include"
+            # ARM64 Deploy Target
+            export MACOSX_DEPLOYMENT_TARGET=${ARM64_DEPLOY}
+
+            mkdir -p "build_debug_arm64"
+            pushd "build_debug_arm64"
+                CFLAGS="$ARCH_FLAGS_ARM64 $DEBUG_CFLAGS" \
+                CXXFLAGS="$ARCH_FLAGS_ARM64 $DEBUG_CXXFLAGS" \
+                CPPFLAGS="$ARCH_FLAGS_ARM64 $DEBUG_CPPFLAGS" \
+                LDFLAGS="$ARCH_FLAGS_ARM64 $DEBUG_LDFLAGS" \
+                cmake .. -GXcode -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
+                    -DCMAKE_BUILD_TYPE="Debug" \
+                    -DCMAKE_C_FLAGS="$ARCH_FLAGS_ARM64 $DEBUG_CFLAGS" \
+                    -DCMAKE_CXX_FLAGS="$ARCH_FLAGS_ARM64 $DEBUG_CXXFLAGS" \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL="0" \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH=NO \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS=YES \
+                    -DCMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT=dwarf \
+                    -DCMAKE_XCODE_ATTRIBUTE_LLVM_LTO=NO \
+                    -DCMAKE_XCODE_ATTRIBUTE_DEAD_CODE_STRIPPING=YES \
+                    -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD="c++17" \
+                    -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY="libc++" \
+                    -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
+                    -DCMAKE_OSX_ARCHITECTURES:STRING=arm64 \
+                    -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
+                    -DCMAKE_OSX_SYSROOT=${SDKROOT} \
+                    -DCMAKE_MACOSX_RPATH=YES \
+                    -DCMAKE_INSTALL_PREFIX="$stage/debug_arm64"
+
+                cmake --build . --config Debug
+                cmake --install . --config Debug
+
+                # conditionally run unit tests
+                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                    ctest -C Debug
+                fi
+            popd
+
+            mkdir -p "build_release_arm64"
+            pushd "build_release_arm64"
+                CFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CFLAGS" \
+                CXXFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CXXFLAGS" \
+                CPPFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CPPFLAGS" \
+                LDFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_LDFLAGS" \
+                cmake .. -GXcode -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
+                    -DCMAKE_BUILD_TYPE="Release" \
+                    -DCMAKE_C_FLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CFLAGS" \
+                    -DCMAKE_CXX_FLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CXXFLAGS" \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL="fast" \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_FAST_MATH=YES \
+                    -DCMAKE_XCODE_ATTRIBUTE_GCC_GENERATE_DEBUGGING_SYMBOLS=YES \
+                    -DCMAKE_XCODE_ATTRIBUTE_DEBUG_INFORMATION_FORMAT=dwarf \
+                    -DCMAKE_XCODE_ATTRIBUTE_LLVM_LTO=NO \
+                    -DCMAKE_XCODE_ATTRIBUTE_DEAD_CODE_STRIPPING=YES \
+                    -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LANGUAGE_STANDARD="c++17" \
+                    -DCMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY="libc++" \
+                    -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
+                    -DCMAKE_OSX_ARCHITECTURES:STRING=arm64 \
+                    -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
+                    -DCMAKE_OSX_SYSROOT=${SDKROOT} \
+                    -DCMAKE_MACOSX_RPATH=YES \
+                    -DCMAKE_INSTALL_PREFIX="$stage/release_arm64"
+
+                cmake --build . --config Release
+                cmake --install . --config Release
+
+                # conditionally run unit tests
+                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                    ctest -C Release
+                fi
+            popd
+
+            # create fat libraries
+            lipo -create ${stage}/debug_x86/lib/libjpeg.a ${stage}/debug_arm64/lib/libjpeg.a -output ${stage}/lib/debug/libjpeg.a
+            lipo -create ${stage}/debug_x86/lib/libturbojpeg.a ${stage}/debug_arm64/lib/libturbojpeg.a -output ${stage}/lib/debug/libturbojpeg.a
+            lipo -create ${stage}/release_x86/lib/libjpeg.a ${stage}/release_arm64/lib/libjpeg.a -output ${stage}/lib/release/libjpeg.a
+            lipo -create ${stage}/release_x86/lib/libturbojpeg.a ${stage}/release_arm64/lib/libturbojpeg.a -output ${stage}/lib/release/libturbojpeg.a
+
+            # copy headers
+            mv $stage/release_x86/include/* $stage_include
         ;;
         linux*)
             # Default target per --address-size
@@ -198,8 +279,6 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
             RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
             DEBUG_CPPFLAGS="-DPIC"
             RELEASE_CPPFLAGS="-DPIC"
-
-            JOBS=`cat /proc/cpuinfo | grep processor | wc -l`
 
             if [ "$AUTOBUILD_ADDRSIZE" = 32 ]
             then
@@ -217,7 +296,7 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                 cmake -E env CFLAGS="$DEBUG_CFLAGS" CXXFLAGS="$DEBUG_CXXFLAGS" \
                 cmake ../ -DCMAKE_BUILD_TYPE="Debug" -DWITH_JPEG8=ON -DWITH_SIMD=ON -DREQUIRE_SIMD=ON
 
-                cmake --build . -j$JOBS --config Debug --clean-first
+                cmake --build . -j$AUTOBUILD_CPU_COUNT --config Debug --clean-first
 
                 # conditionally run unit tests
                 if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
@@ -234,7 +313,7 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                 cmake -E env CFLAGS="$RELEASE_CFLAGS" CXXFLAGS="$RELEASE_CXXFLAGS" \
                 cmake ../ -DCMAKE_BUILD_TYPE="Release" -DWITH_JPEG8=ON -DWITH_SIMD=ON -DREQUIRE_SIMD=ON
 
-                cmake --build . -j$JOBS --config Release --clean-first
+                cmake --build . -j$AUTOBUILD_CPU_COUNT --config Release --clean-first
 
                 # conditionally run unit tests
                 if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
