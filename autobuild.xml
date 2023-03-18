@@ -6,7 +6,7 @@
       <key>canonical_repo</key>
       <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libjpeg-turbo</string>
       <key>copyright</key>
-      <string>Copyright (C)2009-2020 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
+      <string>Copyright (C)2009-2023 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
       <key>description</key>
       <string>JPEG encoding, decoding library</string>
       <key>license</key>
