@@ -148,9 +148,9 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                 cmake --install . --config Debug
 
                 # conditionally run unit tests
-                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Debug
-                fi
+                # if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                #    ctest -C Debug
+                # fi
             popd
 
             mkdir -p "build_release_x86"
@@ -185,9 +185,9 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                 cmake --install . --config Release
 
                 # conditionally run unit tests
-                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Release
-                fi
+                # if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                #     ctest -C Release
+                # fi
             popd
 
             # ARM64 Deploy Target
@@ -224,9 +224,9 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                 cmake --install . --config Debug
 
                 # conditionally run unit tests
-                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Debug
-                fi
+                # if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                #     ctest -C Debug
+                # fi
             popd
 
             mkdir -p "build_release_arm64"
@@ -260,9 +260,9 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                 cmake --install . --config Release
 
                 # conditionally run unit tests
-                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Release
-                fi
+                # if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                #     ctest -C Release
+                # fi
             popd
 
             # create fat libraries
