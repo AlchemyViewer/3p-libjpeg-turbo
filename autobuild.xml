@@ -4,7 +4,7 @@
     <key>package_description</key>
     <map>
       <key>canonical_repo</key>
-      <string>https://git.alchemyviewer.org/alchemy/thirdparty/3p-libjpeg-turbo</string>
+      <string>https://github.com/AlchemyViewer/3p-libjpeg-turbo</string>
       <key>copyright</key>
       <string>Copyright (C)2009-2023 D. R. Commander. All Rights Reserved. Copyright (C)2015 Viktor Szathmáry. All Rights Reserved.</string>
       <key>description</key>
@@ -64,7 +64,6 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/debug/*.a*</string>
             <string>lib/release/*.a*</string>
           </array>
           <key>name</key>
@@ -89,7 +88,6 @@
           </map>
           <key>manifest</key>
           <array>
-            <string>lib/debug/*.so*</string>
             <string>lib/release/*.so*</string>
           </array>
           <key>name</key>
