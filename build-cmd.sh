@@ -106,9 +106,6 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                 # fi
             popd
 
-            # ARM64 Deploy Target
-            export MACOSX_DEPLOYMENT_TARGET=${ARM64_DEPLOY}
-
             mkdir -p "build_release_arm64"
             pushd "build_release_arm64"
                 CFLAGS="$C_OPTS_ARM64" \
