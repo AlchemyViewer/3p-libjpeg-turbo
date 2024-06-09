@@ -41,13 +41,6 @@ VERSION_HEADER_FILE="$stage_include/jconfig.h"
 pushd "$LIBJPEG_TURBO_SOURCE_DIR"
     case "$AUTOBUILD_PLATFORM" in
         windows*)
-            if [ "$AUTOBUILD_ADDRSIZE" = 32 ]
-            then
-                archflags="/arch:SSE2"
-            else
-                archflags=""
-            fi
-
             mkdir -p "$stage/lib/debug"
             mkdir -p "$stage/lib/release"
 
@@ -79,44 +72,28 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
             cp -a turbojpeg.h "$stage_include"
         ;;
         darwin*)
-            # Setup osx sdk platform
-            SDKNAME="macosx"
-            export SDKROOT=$(xcodebuild -version -sdk ${SDKNAME} Path)
-
-            # Deploy Targets
-            X86_DEPLOY=10.15
-            ARM64_DEPLOY=11.0
-
             # Setup build flags
-            ARCH_FLAGS_X86="-arch x86_64 -mmacosx-version-min=${X86_DEPLOY} -isysroot ${SDKROOT} -msse4.2"
-            ARCH_FLAGS_ARM64="-arch arm64 -mmacosx-version-min=${ARM64_DEPLOY} -isysroot ${SDKROOT}"
-            DEBUG_COMMON_FLAGS="-O0 -g -fPIC -DPIC"
-            RELEASE_COMMON_FLAGS="-O3 -g -fPIC -DPIC -fstack-protector-strong"
-            DEBUG_CFLAGS="$DEBUG_COMMON_FLAGS"
-            RELEASE_CFLAGS="$RELEASE_COMMON_FLAGS"
-            DEBUG_CXXFLAGS="$DEBUG_COMMON_FLAGS -std=c++17"
-            RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
-            DEBUG_CPPFLAGS="-DPIC"
-            RELEASE_CPPFLAGS="-DPIC"
-            DEBUG_LDFLAGS="-Wl,-headerpad_max_install_names"
-            RELEASE_LDFLAGS="-Wl,-headerpad_max_install_names"
+            C_OPTS_X86="-arch x86_64 $LL_BUILD_RELEASE_CFLAGS"
+            C_OPTS_ARM64="-arch arm64 $LL_BUILD_RELEASE_CFLAGS"
+            CXX_OPTS_X86="-arch x86_64 $LL_BUILD_RELEASE_CXXFLAGS"
+            CXX_OPTS_ARM64="-arch arm64 $LL_BUILD_RELEASE_CXXFLAGS"
+            LINK_OPTS_X86="-arch x86_64 $LL_BUILD_RELEASE_LINKER"
+            LINK_OPTS_ARM64="-arch arm64 $LL_BUILD_RELEASE_LINKER"
 
-            # x86 Deploy Target
-            export MACOSX_DEPLOYMENT_TARGET=${X86_DEPLOY}
+            # deploy target
+            export MACOSX_DEPLOYMENT_TARGET=${LL_BUILD_DARWIN_BASE_DEPLOY_TARGET}
 
             mkdir -p "build_release_x86"
             pushd "build_release_x86"
-                CFLAGS="$ARCH_FLAGS_X86 $RELEASE_CFLAGS" \
-                CXXFLAGS="$ARCH_FLAGS_X86 $RELEASE_CXXFLAGS" \
-                CPPFLAGS="$ARCH_FLAGS_X86 $RELEASE_CPPFLAGS" \
-                LDFLAGS="$ARCH_FLAGS_X86 $RELEASE_LDFLAGS" \
+                CFLAGS="$C_OPTS_X86" \
+                CXXFLAGS="$CXX_OPTS_X86" \
+                LDFLAGS="$LINK_OPTS_X86" \
                 cmake .. -G Ninja -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
                     -DCMAKE_BUILD_TYPE="Release" \
-                    -DCMAKE_C_FLAGS="$ARCH_FLAGS_X86 $RELEASE_CFLAGS" \
-                    -DCMAKE_CXX_FLAGS="$ARCH_FLAGS_X86 $RELEASE_CXXFLAGS" \
+                    -DCMAKE_C_FLAGS="$C_OPTS_X86" \
+                    -DCMAKE_CXX_FLAGS="$CXX_OPTS_X86" \
                     -DCMAKE_OSX_ARCHITECTURES:STRING=x86_64 \
                     -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
-                    -DCMAKE_OSX_SYSROOT=${SDKROOT} \
                     -DCMAKE_MACOSX_RPATH=YES \
                     -DCMAKE_INSTALL_PREFIX="$stage/release_x86"
 
@@ -134,17 +111,15 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
 
             mkdir -p "build_release_arm64"
             pushd "build_release_arm64"
-                CFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CFLAGS" \
-                CXXFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CXXFLAGS" \
-                CPPFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CPPFLAGS" \
-                LDFLAGS="$ARCH_FLAGS_ARM64 $RELEASE_LDFLAGS" \
+                CFLAGS="$C_OPTS_ARM64" \
+                CXXFLAGS="$CXX_OPTS_ARM64" \
+                LDFLAGS="$LINK_OPTS_ARM64" \
                 cmake .. -G Ninja -DWITH_JPEG8=ON -DWITH_SIMD=ON -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
                     -DCMAKE_BUILD_TYPE="Release" \
-                    -DCMAKE_C_FLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CFLAGS" \
-                    -DCMAKE_CXX_FLAGS="$ARCH_FLAGS_ARM64 $RELEASE_CXXFLAGS" \
+                    -DCMAKE_C_FLAGS="$C_OPTS_ARM64" \
+                    -DCMAKE_CXX_FLAGS="$CXX_OPTS_ARM64" \
                     -DCMAKE_OSX_ARCHITECTURES:STRING=arm64 \
                     -DCMAKE_OSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET} \
-                    -DCMAKE_OSX_SYSROOT=${SDKROOT} \
                     -DCMAKE_MACOSX_RPATH=YES \
                     -DCMAKE_INSTALL_PREFIX="$stage/release_arm64"
 
@@ -165,32 +140,31 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
             mv $stage/release_x86/include/* $stage_include
         ;;
         linux*)
+            # Linux build environment at Linden comes pre-polluted with stuff that can
+            # seriously damage 3rd-party builds.  Environmental garbage you can expect
+            # includes:
+            #
+            #    DISTCC_POTENTIAL_HOSTS     arch           root        CXXFLAGS
+            #    DISTCC_LOCATION            top            branch      CC
+            #    DISTCC_HOSTS               build_name     suffix      CXX
+            #    LSDISTCC_ARGS              repo           prefix      CFLAGS
+            #    cxx_version                AUTOBUILD      SIGN        CPPFLAGS
+            #
+            # So, clear out bits that shouldn't affect our configure-directed build
+            # but which do nonetheless.
+            #
+            unset DISTCC_HOSTS CFLAGS CPPFLAGS CXXFLAGS
+
             # Default target per --address-size
-            opts="${TARGET_OPTS:--m$AUTOBUILD_ADDRSIZE}"
-
-            # Setup build flags
-            DEBUG_COMMON_FLAGS="$opts -Og -g -fPIC -DPIC"
-            RELEASE_COMMON_FLAGS="$opts -O3 -g -fPIC -DPIC -D_FORTIFY_SOURCE=2"
-            DEBUG_CFLAGS="$DEBUG_COMMON_FLAGS"
-            RELEASE_CFLAGS="$RELEASE_COMMON_FLAGS"
-            DEBUG_CXXFLAGS="$DEBUG_COMMON_FLAGS -std=c++17"
-            RELEASE_CXXFLAGS="$RELEASE_COMMON_FLAGS -std=c++17"
-            DEBUG_CPPFLAGS="-DPIC"
-            RELEASE_CPPFLAGS="-DPIC"
-
-            if [ "$AUTOBUILD_ADDRSIZE" = 32 ]
-            then
-                archflags="/arch:SSE2"
-            else
-                archflags=""
-            fi
+            opts_c="${TARGET_OPTS:--m$AUTOBUILD_ADDRSIZE $LL_BUILD_RELEASE_CFLAGS}"
+            opts_cxx="${TARGET_OPTS:--m$AUTOBUILD_ADDRSIZE $LL_BUILD_RELEASE_CXXFLAGS}"
 
             mkdir -p "$stage/lib/release"
 
             mkdir -p "build_release"
             pushd "build_release"
                 # Invoke cmake and use as official build
-                cmake -E env CFLAGS="$RELEASE_CFLAGS" CXXFLAGS="$RELEASE_CXXFLAGS" \
+                cmake -E env CFLAGS="$opts_c" CXXFLAGS="$opts_cxx" \
                 cmake .. -G Ninja -DCMAKE_BUILD_TYPE="Release" -DWITH_JPEG8=ON -DWITH_SIMD=ON -DREQUIRE_SIMD=ON
 
                 cmake --build . -j$AUTOBUILD_CPU_COUNT --config Release --clean-first
