@@ -8,14 +8,17 @@ jobs:
         addrsize: ["64"]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: ilammy/setup-nasm@v1
+      - name: Setup Homebrew Packages
+        if: ${{ runner.os == 'Windows' }}
+        shell: bash
+        run: choco install nasm
       - uses: AlchemyViewer/action-autobuild@v4
         with:
           addrsize: ${{ matrix.addrsize }}
           build-variables-repo: alchemyviewer/build-variables
           build-variables-ref: alchemy
-          apt-packages: ninja-build
-          brew-packages: ninja
+          apt-packages: ninja-build nasm
+          brew-packages: ninja nasm
   release:
     needs: build
     runs-on: [ubuntu-latest]
