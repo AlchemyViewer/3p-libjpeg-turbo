@@ -34,44 +34,66 @@ source "$(dirname "$AUTOBUILD_VARIABLES_FILE")/functions"
 top="$(pwd)"
 stage="$top/stage"
 stage_include="$stage/include/jpeglib"
+stage_debug="$stage/lib/debug"
 stage_release="$stage/lib/release"
 mkdir -p "$stage_include"
+mkdir -p "$stage_debug"
 mkdir -p "$stage_release"
 
 pushd "$LIBJPEG_TURBO_SOURCE_DIR"
     case "$AUTOBUILD_PLATFORM" in
         windows*)
-            opts="$(replace_switch /Zi /Z7 $LL_BUILD_RELEASE)"
-            plainopts="$(remove_switch /GR $(remove_cxxstd $opts))"
+            load_vsvars
+            
+            mkdir -p "build_debug"
+            pushd "build_debug"
+                opts="$(replace_switch /Zi /Z7 $LL_BUILD_DEBUG)"
+                plainopts="$(remove_switch /GR $(remove_cxxstd $opts))"
 
-            mkdir -p "$stage/lib/release"
-
-            mkdir -p "build"
-            pushd "build"
                 # Invoke cmake and use as official build
                 cmake -G "Ninja Multi-Config" ../ \
                     -DCMAKE_C_FLAGS:STRING="$plainopts" \
                     -DCMAKE_CXX_FLAGS:STRING="$opts" \
+                    -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="Embedded" \
                     -DWITH_JPEG8=ON -DWITH_CRT_DLL=ON -DWITH_SIMD=ON \
-                    -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON
+                    -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
+                    -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)" \
+                    -DCMAKE_INSTALL_LIBDIR="$(cygpath -m "$stage_debug")" \
+                    -DCMAKE_INSTALL_INCLUDEDIR="$(cygpath -m "$stage_include")"
 
-                cmake --build . --config Release
+                cmake --build . --config Debug --parallel $AUTOBUILD_CPU_COUNT
+                cmake --install . --config Debug
 
                 # conditionally run unit tests
                 if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                   ctest -C Release
+                   ctest -C Debug --parallel $AUTOBUILD_CPU_COUNT
                 fi
-
-                cp -a Release/jpeg-static.lib "$stage_release/jpeg.lib"
-                cp -a Release/turbojpeg-static.lib "$stage_release/turbojpeg.lib"
-
-                cp -a "jconfig.h" "$stage_include"
             popd
 
-            cp -a jerror.h "$stage_include"
-            cp -a jmorecfg.h "$stage_include"
-            cp -a jpeglib.h "$stage_include"
-            cp -a turbojpeg.h "$stage_include"
+            mkdir -p "build_release"
+            pushd "build_release"
+                opts="$(replace_switch /Zi /Z7 $LL_BUILD_RELEASE)"
+                plainopts="$(remove_switch /GR $(remove_cxxstd $opts))"
+
+                # Invoke cmake and use as official build
+                cmake -G "Ninja Multi-Config" ../ \
+                    -DCMAKE_C_FLAGS:STRING="$plainopts" \
+                    -DCMAKE_CXX_FLAGS:STRING="$opts" \
+                    -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT="Embedded" \
+                    -DWITH_JPEG8=ON -DWITH_CRT_DLL=ON -DWITH_SIMD=ON \
+                    -DENABLE_SHARED=OFF -DENABLE_STATIC=ON -DREQUIRE_SIMD=ON \
+                    -DCMAKE_INSTALL_PREFIX="$(cygpath -m $stage)" \
+                    -DCMAKE_INSTALL_LIBDIR="$(cygpath -m "$stage_release")" \
+                    -DCMAKE_INSTALL_INCLUDEDIR="$(cygpath -m "$stage_include")"
+
+                cmake --build . --config Release --parallel $AUTOBUILD_CPU_COUNT
+                cmake --install . --config Release
+
+                # conditionally run unit tests
+                if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
+                   ctest -C Release --parallel $AUTOBUILD_CPU_COUNT
+                fi
+            popd
         ;;
         darwin*)
             export MACOSX_DEPLOYMENT_TARGET="$LL_BUILD_DARWIN_DEPLOY_TARGET"
@@ -128,11 +150,11 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                                 -DCMAKE_C_FLAGS="$plainopts" \
                                 -DCMAKE_CXX_FLAGS="$opts"
 
-                cmake --build . -j$AUTOBUILD_CPU_COUNT --config Release --clean-first
+                cmake --build . --config Release --parallel $AUTOBUILD_CPU_COUNT
 
                 # conditionally run unit tests
                 if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
-                    ctest -C Release
+                    ctest -C Release --parallel $AUTOBUILD_CPU_COUNT
                 fi
 
                 cp -a libjpeg.a "$stage_release/"
