@@ -148,25 +148,19 @@ pushd "$LIBJPEG_TURBO_SOURCE_DIR"
                                 -DWITH_JPEG8=ON -DWITH_SIMD=ON -DREQUIRE_SIMD=ON \
                                 -DENABLE_SHARED=OFF -DENABLE_STATIC=ON \
                                 -DCMAKE_C_FLAGS="$plainopts" \
-                                -DCMAKE_CXX_FLAGS="$opts"
+                                -DCMAKE_CXX_FLAGS="$opts" \
+                                -DCMAKE_INSTALL_PREFIX="$stage" \
+                                -DCMAKE_INSTALL_LIBDIR="$stage/lib/release" \
+                                -DCMAKE_INSTALL_INCLUDEDIR="$stage_include"
 
                 cmake --build . --config Release --parallel $AUTOBUILD_CPU_COUNT
+                cmake --install . --config Release
 
                 # conditionally run unit tests
                 if [ "${DISABLE_UNIT_TESTS:-0}" = "0" ]; then
                     ctest -C Release --parallel $AUTOBUILD_CPU_COUNT
                 fi
-
-                cp -a libjpeg.a "$stage_release/"
-                cp -a libturbojpeg.a "$stage_release/"
-
-                cp -a "jconfig.h" "$stage_include"
             popd
-
-            cp -a jerror.h "$stage_include"
-            cp -a jmorecfg.h "$stage_include"
-            cp -a jpeglib.h "$stage_include"
-            cp -a turbojpeg.h "$stage_include"
         ;;
     esac
     mkdir -p "$stage/LICENSES"
